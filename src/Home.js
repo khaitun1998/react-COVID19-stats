@@ -41,7 +41,6 @@ let UpdatedTime = ({ time }) => {
 };
 
 let CovidTable = ({data}) => {
-
     const rows = data.map(row => {
         return (
             <tr key={row.id}>
@@ -66,8 +65,8 @@ let CovidTable = ({data}) => {
                 <tr>
                     <th>Tỉnh thành</th>
                     <th>Số ca nhiễm</th>
-                    <th>Số ca chết</th>
                     <th>Số ca hồi phục</th>
+                    <th>Số ca tử vong</th>
                 </tr>
             </thead>
 
@@ -146,7 +145,7 @@ let CovidChart = ({ chartData, chartID }) => {
     }, [chartData, chartID])
 
     return (
-        <div id={chartID} style={{ width: "100%", height: "800px" }}></div>
+        <div id={chartID} style={{ width: "100%", height: "600px" }}></div>
     );
 }
 
