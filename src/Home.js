@@ -1,9 +1,13 @@
-import React, { useState, useEffect, useLayoutEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
+import M from 'materialize-css';
+import moment from 'moment';
+
+import Chart from './components/Chart';
+import NavBar from "./components/NavBar";
+import UpdatedTime from "./components/UpdatedTime";
+import Table from "./components/Table";
+
 import "./Home.css";
-import moment from "moment";
-import numeral from 'numeral';
-import * as am4core from "@amcharts/amcharts4/core";
-import * as am4charts from "@amcharts/amcharts4/charts";
 
 let compare = (a, b) => {
     const genreA = a.province_name.toUpperCase();
@@ -18,203 +22,163 @@ let compare = (a, b) => {
     return comparison;
 }
 
-let NavBar = () => {
-    return (
-        <nav className="indigo darken-3">
-            <div className="nav-wrapper">
-                <a href="# " className="brand-logo center">
-                    COVID-19
-                </a>
-            </div>
-        </nav>
-    );
-};
-
-let UpdatedTime = ({ time }) => {
-    return (
-        <span>
-      <i>
-        Lần cập nhập cuối: <b>{moment.unix(time).format("DD/MM/YYYY h:mm:ss a")}</b>
-      </i>
-    </span>
-    );
-};
-
-let CovidTable = ({data}) => {
-    const rows = data.map(row => {
-        return (
-            <tr key={row.id}>
-                <td>{row.province_name}</td>
-                <td>
-                    {numeral(row.confirmed).format(0, 0)} ca{" "}
-                    <b>(Tăng {numeral(row.increase_confirmed).format(0,0)} ca)</b>
-                </td>
-                <td>
-                    {numeral(row.recovered).format(0,0)} ca <b>(Tăng {numeral(row.increase_recovered).format(0,0)} ca)</b>
-                </td>
-                <td>
-                    {numeral(row.deaths).format(0,0)} ca <b>(Tăng {numeral(row.increase_deaths).format(0,0)} ca)</b>
-                </td>
-            </tr>
-        );
-    });
-
-    return (
-        <table className="striped highlight centered responsive-table">
-            <thead>
-                <tr>
-                    <th>Tỉnh thành</th>
-                    <th>Số ca nhiễm</th>
-                    <th>Số ca hồi phục</th>
-                    <th>Số ca tử vong</th>
-                </tr>
-            </thead>
-
-            <tbody>{rows}</tbody>
-        </table>
-    );
-};
-
-let CovidChart = ({ chartData, chartID }) => {
-    const chart = useRef(null);
-
-    if(chartID === "dataTG") chartData = chartData.filter(function(el) { return el.province_name !== "Thế giới"; })
-    else if(chartID === "dataVN") chartData = chartData.filter(function(el) { return el.province_name !== "Việt Nam"; })
-
-    useLayoutEffect(() => {
-        // Create chart instance
-        let x = am4core.create(chartID, am4charts.XYChart);
-
-        // Add data
-        x.data = chartData;
-
-        // Create axes
-        let categoryAxis = x.xAxes.push(new am4charts.CategoryAxis());
-        categoryAxis.dataFields.category = "province_name";
-        categoryAxis.renderer.labels.template.rotation = 270;
-        categoryAxis.renderer.labels.template.hideOversized = false;
-        categoryAxis.renderer.minGridDistance = 20;
-        categoryAxis.renderer.labels.template.horizontalCenter = "right";
-        categoryAxis.renderer.labels.template.verticalCenter = "middle";
-        categoryAxis.tooltip.label.rotation = 270;
-        categoryAxis.tooltip.label.horizontalCenter = "right";
-        categoryAxis.tooltip.label.verticalCenter = "middle";
-
-        let valueAxis = x.yAxes.push(new am4charts.ValueAxis());
-        valueAxis.renderer.inside = true;
-        valueAxis.renderer.labels.template.disabled = true;
-        valueAxis.min = 0;
-
-        // Create series
-        function createSeries(field, name) {
-            // Set up series
-            let series = x.series.push(new am4charts.ColumnSeries());
-            series.name = name;
-            series.dataFields.valueY = field;
-            series.dataFields.categoryX = "province_name";
-            series.sequencedInterpolation = true;
-
-            // Make it stacked
-            series.stacked = true;
-
-            // Configure columns
-            series.columns.template.width = am4core.percent(60);
-            series.columns.template.tooltipText = "[bold]{name}[/]\n[font-size:14px]{categoryX}: {valueY}";
-
-            // Add label
-            let labelBullet = series.bullets.push(new am4charts.LabelBullet());
-            labelBullet.label.text = "{valueY}";
-            labelBullet.locationY = 0.5;
-            labelBullet.label.hideOversized = true;
-
-            return series;
-        }
-
-        createSeries("confirmed", "Số ca nhiễm");
-        createSeries("deaths", "Số ca chết");
-        createSeries("recovered", "Số ca hồi phục");
-
-        // Legend
-        x.legend = new am4charts.Legend();
-
-        chart.current = x;
-
-        return () => {
-            x.dispose();
-        };
-    }, [chartData, chartID])
-
-    return (
-        <div id={chartID} style={{ width: "100%", height: "600px" }}></div>
-    );
-}
-
 let Home = () => {
+    const url = ["https://ncovi.vnpt.vn/thongtindichbenh_v2",
+                "https://webapi.dantri.com.vn/corona-info"];
+
     const [dataVN, setDataVN] = useState([]);
     const [dataTG, setDataTG] = useState([]);
     const [lastUpdate, setLastUpdate] = useState("");
     const [showChart, setShowChart] = useState(0);
+    const [currentURL, setCurrentURL] = useState(url[0]);
 
     useEffect(() => {
-        const url = "https://ncovi.vnpt.vn/thongtindichbenh_v2";
+        let select = document.querySelectorAll("select");
+        M.FormSelect.init(select);
 
-        fetch(url)
+        fetch(currentURL)
             .then(result => result.json())
             .then(result => {
-                if(result.data.VN) setDataVN(result.data.VN);
-                if(result.data.TG){
-                    setDataTG(result.data.TG.sort(compare));
-                    setLastUpdate(result.data.TG[0].last_update);
-                }
-            });
-    }, []);
+                switch(currentURL){
+                    case url[0]:
+                        if(result.data.VN) setDataVN(result.data.VN);
 
-    let handleButtonShowChart = () => {
-        if(window.confirm(`Bạn có chắc chắn muốn tải biểu đồ thống kê toàn Thế Giới?`)) {
-            setShowChart(1);
-        }
+                        if(result.data.TG){
+                            setDataTG(result.data.TG.sort(compare));
+                            setLastUpdate(result.data.TG[0].last_update);
+                        }
+
+                        break;
+                    case url[1]:
+                        if(result.data.latest) {
+                            let convertedDataTG = [],
+                                dataKey = Object.keys(result.data.latest);
+
+                            dataKey.forEach((value, idx) => {
+                                convertedDataTG.push({
+                                    id: idx + 1,
+                                    confirmed: result.data.latest[value].confirmed,
+                                    deaths: result.data.latest[value].deaths,
+                                    recovered: result.data.latest[value].recovered,
+                                    province_name: result.data.latest[value].vietnamese
+                                })
+                            })
+                            setDataTG(convertedDataTG)
+                            setDataVN('');
+                            setLastUpdate(moment().unix());
+                        }
+
+                        break;
+                    default:
+                        throw Error;
+                }
+
+            })
+            .catch(e => console.log(e));
+    }, [currentURL]);
+
+    const handleChangeDataSource = e => {
+        setCurrentURL(url[parseInt(e.target.value)]);
+        console.log(dataTG);
     }
 
-    return (
-        <div className="row">
-            <NavBar />
+    if(url.indexOf(currentURL) === 0){
+        const handleButtonShowChart = () => {
+            if(window.confirm(`Bạn có chắc chắn muốn tải biểu đồ thống kê toàn Thế Giới?`)) {
+                setShowChart(1);
+            }
+        }
 
-            <div style={{ padding: "1% 5% 1% 5%" }}>
-                <h3>Việt Nam</h3>
-                <UpdatedTime time={lastUpdate} style={{"padding": "10px"}}/>
-                <br/>
+        return (
+            <div className="row">
+                <NavBar />
 
-                {dataVN.length > 0 &&
-                <CovidChart chartData={dataVN} chartID={"dataVN"}/>
-                }
+                <div style={{ padding: "1% 5% 1% 5%" }}>
+                    <div style={{"top": 0, "left": 0, "float": "right", "margin": "50px 2% 0 0"}}>
+                        <div className="input-field">
+                            <select onChange={e => handleChangeDataSource(e)} value={url.indexOf(currentURL)}>
+                                <option value="0">nCovi</option>
+                                <option value="1">Dân trí</option>
+                            </select>
+                            <label>Nguồn dữ liệu</label>
+                        </div>
+                    </div>
 
-                {dataVN.length > 0
-                    ? <CovidTable data={dataVN}/>
-                    : <h4 style={{"textAlign": "center"}}>Không có dữ liệu</h4>
-                }
+                    <h3>Việt Nam</h3>
+                    <UpdatedTime time={lastUpdate} style={{"padding": "10px"}}/>
 
-                <h3>Thế giới</h3>
-                <UpdatedTime time={lastUpdate} style={{"padding": "10px"}}/>
+                    <br/>
 
-                {showChart === 0 &&
+                    {dataVN.length > 0 &&
+                        <Chart chartData={dataVN} chartID={"dataVN"}/>
+                    }
+
+                    {dataVN.length > 0
+                        ? <Table data={dataVN}/>
+                        : <h4 style={{"textAlign": "center"}}>Không có dữ liệu</h4>
+                    }
+
+                    <h3>Thế giới</h3>
+                    <UpdatedTime time={lastUpdate} style={{"padding": "10px"}}/>
+
+                    {showChart === 0 &&
                     <div style={{"padding": "1% 0 1% 0"}}>
                         <button onClick={handleButtonShowChart} className="waves-effect waves-light btn indigo darken-3">Hiện biểu đồ</button>
                     </div>
-                }
+                    }
 
-                {(dataTG.length > 0 && showChart === 1) &&
-                    <CovidChart chartData={dataTG} chartID={"dataTG"}/>
-                }
+                    {(dataTG.length > 0 && showChart === 1) &&
+                        <Chart chartData={dataTG} chartID={"dataTG"}/>
+                    }
 
-                {dataTG.length > 0
-                    ? <CovidTable data={dataTG}/>
-                    : <h4 style={{"textAlign": "center"}}>Không có dữ liệu</h4>
-                }
-                <div className="right" style={{"padding": "1%"}}><i>Nguồn: API ứng dụng <a
-                    href="https://ncovi.vnpt.vn">ncovi.vnpt.vn</a></i></div>
+                    {dataTG.length > 0
+                        ? <Table data={dataTG}/>
+                        : <h4 style={{"textAlign": "center"}}>Không có dữ liệu</h4>
+                    }
+                    <div className="right" style={{"padding": "1%"}}><i>Nguồn: API ứng dụng <a
+                        href="https://ncovi.vnpt.vn">ncovi.vnpt.vn</a></i>
+                    </div>
+                </div>
             </div>
-        </div>
-    );
+        );
+    }
+    else if(url.indexOf(currentURL) === 1){
+        return (
+            <div className="row">
+                <NavBar />
+
+                <div style={{ padding: "1% 5% 1% 5%" }}>
+                    <div style={{"top": 0, "left": 0, "float": "right", "margin": "50px 2% 0 0"}}>
+                        <div className="input-field">
+                            <select onChange={e => handleChangeDataSource(e)} value={url.indexOf(currentURL)}>
+                                <option value="0">nCovi</option>
+                                <option value="1">Dân trí</option>
+                            </select>
+                            <label>Nguồn dữ liệu</label>
+                        </div>
+                    </div>
+
+                    <h3>Thế giới</h3>
+                    <UpdatedTime time={lastUpdate} style={{"padding": "10px"}}/>
+
+                    <br/>
+
+                    {dataTG.length > 0 &&
+                        <Chart chartData={dataTG} chartID={"dataTG"}/>
+                    }
+
+                    {dataTG.length > 0
+                        ? <Table data={dataTG}/>
+                        : <h4 style={{"textAlign": "center"}}>Không có dữ liệu</h4>
+                    }
+
+                    <div className="right" style={{"padding": "2%"}}><i>Nguồn: API báo <a
+                        href="https://dantri.com.vn">Dân trí</a></i>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 };
 
 export default Home;
